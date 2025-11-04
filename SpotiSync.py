@@ -27,25 +27,37 @@ class ToolTip:
     def show_tooltip(self, event):
         if self.tooltip_window:
             return
-        
-        # Get widget position
-        x, y, _, _ = self.widget.bbox("insert")
-        x += self.widget.winfo_rootx() + 25
-        y += self.widget.winfo_rooty() + 20
+
+        # Compute a safe position near the widget
+        try:
+            bx = by = 0
+            bbox = self.widget.bbox("insert")
+            if bbox is not None:
+                bx, by, _, _ = bbox
+            x = self.widget.winfo_rootx() + (bx if bx else 0) + 20
+            y = self.widget.winfo_rooty() + (by if by else 0) + 20
+        except Exception:
+            x = self.widget.winfo_rootx() + 20
+            y = self.widget.winfo_rooty() + 20
 
         # Create tooltip window
         self.tooltip_window = tk.Toplevel(self.widget)
-        self.tooltip_window.wm_overrideredirect(True) 
+        self.tooltip_window.wm_overrideredirect(True)
         self.tooltip_window.wm_geometry(f"+{x}+{y}")
 
-        label = ttk.Label(
-            self.tooltip_window, 
-            text=self.text, 
-            background="#333333", 
-            foreground="#FFFFFF", 
-            relief="solid", 
-            borderwidth=1, 
-            padding=5
+        # Use tk.Label for custom bg/fg; add wrapping and padding
+        label = tk.Label(
+            self.tooltip_window,
+            text=self.text,
+            background="#333333",
+            foreground="#FFFFFF",
+            relief="solid",
+            bd=1,
+            padx=8,
+            pady=6,
+            justify="left",
+            wraplength=360,
+            font=("Segoe UI", 9),
         )
         label.pack()
 
@@ -501,7 +513,8 @@ class DownloaderApp:
 
         # Title
         title_lbl = ttk.Label(container, text="SpotiSync – Help & Guide", font=("Segoe UI", 12, "bold"))
-        title_lbl.pack(anchor="w", pady=(0, 8))
+        title_lbl.pack(anchor="w", pady=(0, 6))
+        ttk.Separator(container, orient="horizontal").pack(fill="x", pady=(0, 8))
 
         # Scrollable text
         text_frame = ttk.Frame(container)
@@ -515,32 +528,31 @@ class DownloaderApp:
 
         guide = (
             "Welcome to SpotiSync!\n\n"
-            "Quick Start:\n"
-            "1) CSV File: Choose one of the following:\n"
-            "   - 'Get CSV...': Open Exportify to export playlists.\n"
-            "   - 'Browse...': Select an existing CSV.\n"
-            "   - 'Create CSV...': Type titles (one per line) and save a CSV with a 'Track Name' column.\n"
-            "   - When you select a CSV, SpotiSync may auto-create a Track-Name-only CSV.\n"
-            "2) Output: Choose where songs will be saved (defaults to your Downloads folder).\n"
-            "3) Format: Pick your desired audio format (e.g., mp3, m4a, wav).\n"
-            "4) Threads: Number of simultaneous downloads. Higher = faster, but heavier.\n"
-            "5) Archive File: Tracks downloaded songs to avoid duplicates.\n"
-            "6) If file exists: Choose 'Skip' (default) or 'Overwrite'.\n"
-            "7) Dry Run: Shows commands without downloading or modifying files.\n"
-            "8) Start Download: Progress and results show in the Status log.\n\n"
-            "During Download:\n"
-            "- Live per-track progress shows percent, size, speed, and ETA.\n"
-            "- Finished tracks show [OK], failures show [FAIL], timeouts show [TIMEOUT], skipped show [SKIP].\n\n"
-            "Notes & Tips:\n"
-            "- The app searches YouTube for 'Track - Artist audio' when possible.\n"
-            "- Filenames are sanitized to be safe for your system.\n"
-            "- If yt-dlp isn't found, the app will try running it via Python module fallback.\n"
-            "- Use the archive file to prevent re-downloading tracks you've already saved.\n"
-            "- You can open Exportify directly from the 'Get CSV...' button.\n\n"
-            "Troubleshooting:\n"
-            "- If downloads fail, check the Status log for error messages from yt-dlp.\n"
-            "- Ensure your CSV has a recognizable 'Track Name' column header.\n"
-            "- Try lowering Threads on slow networks or systems.\n"
+            "Quick Start\n"
+            "- 'Get CSV...': Open Exportify to export playlists.\n"
+            "- 'Browse...': Select an existing CSV file.\n"
+            "- 'Create CSV...': Type titles (one per line) and save a CSV with a 'Track Name' column.\n"
+            "- When you select a CSV, SpotiSync may auto-create a Track-Name-only CSV.\n"
+            "- Output: Save location (defaults to your Downloads folder).\n"
+            "- Format: mp3, m4a, wav, etc.\n"
+            "- Threads: More threads = faster, heavier.\n"
+            "- Archive File: Avoids duplicate downloads.\n"
+            "- If file exists: 'Skip' (default) or 'Overwrite'.\n"
+            "- Dry Run: Show commands without downloading or modifying files.\n"
+            "- Start Download to begin.\n\n"
+            "During Download\n"
+            "- Live progress per track: percent, size, speed, ETA.\n"
+            "- Completed: [OK]  Failed: [FAIL]  Timeout: [TIMEOUT]  Skipped: [SKIP].\n\n"
+            "Notes & Tips\n"
+            "- Searches YouTube for 'Track - Artist audio' when possible.\n"
+            "- Filenames are sanitized.\n"
+            "- If yt-dlp isn't found, Python module fallback is used.\n"
+            "- Use the archive file to prevent re-downloading.\n"
+            "- 'Open Exportify' opens the Exportify website.\n\n"
+            "Troubleshooting\n"
+            "- Check the Status log for yt-dlp errors.\n"
+            "- Ensure the CSV has a 'Track Name' header.\n"
+            "- Lower Threads if your network or system is slow.\n"
         )
 
         help_text.insert("1.0", guide)
