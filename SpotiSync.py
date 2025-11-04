@@ -170,6 +170,14 @@ class DownloaderApp:
         self.dry_run_help.grid(row=2, column=2, padx=(0, 5), pady=5, sticky="w")
         ToolTip(self.dry_run_help, "Show what commands would be run without\nactually downloading any files.")
 
+        # Help button
+        self.help_button = ttk.Button(
+            options_frame,
+            text="Help",
+            command=self.open_help_window
+        )
+        self.help_button.grid(row=2, column=5, padx=5, pady=5, sticky="e")
+
         # --- 4. Populate the "Status" frame ---
         self.progress_bar = ttk.Progressbar(status_frame, orient="horizontal", mode="determinate")
         self.progress_bar.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
@@ -344,18 +352,58 @@ class DownloaderApp:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-            proc = subprocess.run(
+            # Stream stdout to parse progress
+            proc = subprocess.Popen(
                 cmd,
-                check=False,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
-                timeout=timeout,
+                bufsize=1,
+                universal_newlines=True,
                 startupinfo=startupinfo,
             )
+
+            start_time = time.time()
+            last_progress = None
+            # Regex for lines like: "[download]  12.3% of 4.95MiB at 1.23MiB/s ETA 00:03"
+            import re
+            prog_re = re.compile(r"^\[download\]\s+(?P<percent>\d+(?:\.\d+)?)%\s+of\s+(?P<size>\S+)\s+at\s+(?P<speed>\S+)\s+ETA\s+(?P<eta>\S+)")
+
+            if proc.stdout is not None:
+                for line in proc.stdout:
+                    line = (line or "").rstrip()
+                    if not line:
+                        continue
+                    # Push informative lines for context
+                    if line.startswith("[download] Destination:") or line.startswith("[ExtractAudio]"):
+                        try:
+                            self.queue.put({"status": "info", "query": query, "message": line})
+                        except Exception:
+                            pass
+                    m = prog_re.match(line)
+                    if m:
+                        progress = {
+                            "status": "progress",
+                            "query": query,
+                            "percent": m.group("percent"),
+                            "size": m.group("size"),
+                            "speed": m.group("speed"),
+                            "eta": m.group("eta"),
+                        }
+                        last_progress = progress
+                        try:
+                            self.queue.put(progress)
+                        except Exception:
+                            pass
+
+                    # Timeout guard
+                    if timeout and (time.time() - start_time) > timeout:
+                        proc.kill()
+                        return {"query": query, "status": "timeout", "error": f"Timed out after {timeout}s"}
+
+            proc.wait()
             success = proc.returncode == 0
-            return {"query": query, "returncode": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr, "status": "ok" if success else "failed"}
-        except subprocess.TimeoutExpired as e:
-            return {"query": query, "status": "timeout", "error": str(e)}
+            return {"query": query, "returncode": proc.returncode, "status": "ok" if success else "failed"}
         except FileNotFoundError as e:
             return {"query": query, "status": "failed", "error": f"yt-dlp not found: {e}"}
         except Exception as e:
@@ -384,6 +432,83 @@ class DownloaderApp:
         except Exception as e:
             return None, f"Error parsing CSV: {e}"
 
+    def open_help_window(self):
+        """Open a small help window with a detailed usage guide."""
+        # If already open, focus it
+        if hasattr(self, "help_window") and self.help_window and tk.Toplevel.winfo_exists(self.help_window):
+            self.help_window.lift()
+            self.help_window.focus_force()
+            return
+
+        self.help_window = tk.Toplevel(self.root)
+        self.help_window.title("How to use SpotiSync")
+        self.help_window.geometry("560x420")
+        self.help_window.minsize(420, 320)
+        self.help_window.transient(self.root)
+
+        # Container frame
+        container = ttk.Frame(self.help_window)
+        container.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Title
+        title_lbl = ttk.Label(container, text="SpotiSync – Help & Guide", font=("Segoe UI", 12, "bold"))
+        title_lbl.pack(anchor="w", pady=(0, 8))
+
+        # Scrollable text
+        text_frame = ttk.Frame(container)
+        text_frame.pack(fill="both", expand=True)
+
+        help_text = tk.Text(text_frame, wrap="word", height=15, state="normal")
+        vscroll = ttk.Scrollbar(text_frame, orient="vertical", command=help_text.yview)
+        help_text.configure(yscrollcommand=vscroll.set)
+        help_text.pack(side="left", fill="both", expand=True)
+        vscroll.pack(side="right", fill="y")
+
+        guide = (
+            "Welcome to SpotiSync!\n\n"
+            "Quick Start:\n"
+            "1) CSV File: Click 'Get CSV...' to open Exportify, or 'Browse...' to select a CSV.\n"
+            "   - A CSV with a 'Track Name' column works best.\n"
+            "   - When you select a CSV, SpotiSync tries to auto-make a file with only 'Track Name'.\n"
+            "2) Output: Choose where downloaded songs will be saved (default: downloads).\n"
+            "3) Format: Pick your desired audio format (e.g., mp3, m4a, wav).\n"
+            "4) Threads: Number of simultaneous downloads. Higher = faster, but heavier.\n"
+            "5) Archive File: Keeps track of downloaded tracks to avoid duplicates.\n"
+            "6) Dry Run: If enabled, shows the commands without downloading.\n"
+            "7) Start Download: Begins processing. Progress and results show in the Status log.\n\n"
+            "Notes & Tips:\n"
+            "- The app searches YouTube for 'Track - Artist audio' when possible.\n"
+            "- Filenames are sanitized to be safe for your system.\n"
+            "- If yt-dlp isn't found, the app will try running it via Python module fallback.\n"
+            "- Use the archive file to prevent re-downloading tracks you've already saved.\n"
+            "- You can open Exportify directly from the 'Get CSV...' button.\n\n"
+            "Troubleshooting:\n"
+            "- If downloads fail, check the Status log for error messages from yt-dlp.\n"
+            "- Ensure your CSV has a recognizable 'Track Name' column header.\n"
+            "- Try lowering Threads on slow networks or systems.\n"
+        )
+
+        help_text.insert("1.0", guide)
+        help_text.config(state="disabled")
+
+        # Action row
+        actions = ttk.Frame(container)
+        actions.pack(fill="x", pady=(8, 0))
+
+        exportify_btn = ttk.Button(actions, text="Open Exportify", command=self.open_exportify)
+        exportify_btn.pack(side="left")
+
+        close_btn = ttk.Button(actions, text="Close", command=self.help_window.destroy)
+        close_btn.pack(side="right")
+
+        def on_close():
+            try:
+                self.help_window.destroy()
+            finally:
+                self.help_window = None
+
+        self.help_window.protocol("WM_DELETE_WINDOW", on_close)
+
     def log_status(self, message):
         """Safely inserts a message into the status_log text widget."""
         self.status_log.config(state="normal")
@@ -410,13 +535,23 @@ class DownloaderApp:
                     self.progress_bar['value'] = 0
                 
                 elif isinstance(msg, dict) and 'status' in msg:
-                    # This is a result from download_track
+                    # Message from download_track
                     status = msg.get("status")
                     query = msg.get("query")
-                    if status == "dry-run":
+                    if status == "progress":
+                        pct = msg.get("percent")
+                        size = msg.get("size")
+                        speed = msg.get("speed")
+                        eta = msg.get("eta")
+                        self.log_status(f"[PROG] {pct}% of {size} at {speed} ETA {eta}  :: {query}")
+                        # Do not advance the overall progress bar on incremental progress
+                    elif status == "info":
+                        self.log_status(f"[INFO] {msg.get('message','').strip()}")
+                    elif status == "dry-run":
                         self.log_status(f"[DRY] {msg['cmd']}")
                     elif status == "ok":
                         self.log_status(f"[OK] {query}")
+                        self.progress_bar.step(1)
                     elif status == "failed":
                         code = msg.get('returncode')
                         err = msg.get('error') or (msg.get('stderr') or '').strip()
@@ -426,11 +561,15 @@ class DownloaderApp:
                             self.log_status(f"[FAIL] {query}")
                         if err:
                             self.log_status(f"       Error: {err}")
+                        self.progress_bar.step(1)
+                    elif status == "timeout":
+                        self.log_status(f"[TIMEOUT] {query}")
+                        err = msg.get('error')
+                        if err:
+                            self.log_status(f"          {err}")
+                        self.progress_bar.step(1)
                     else:
                         self.log_status(f"[{status.upper()}] {query}")
-                    
-                    # Update progress bar
-                    self.progress_bar.step(1)
 
                 else:
                     # It's a plain string message
