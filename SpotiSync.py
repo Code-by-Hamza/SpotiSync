@@ -105,13 +105,21 @@ class DownloaderApp:
         )
         self.get_csv_button.grid(row=0, column=4, padx=(0, 5), pady=5)
 
+        self.create_csv_button = ttk.Button(
+            input_frame,
+            text="Create CSV...",
+            command=self.open_create_csv_window
+        )
+        self.create_csv_button.grid(row=0, column=5, padx=5, pady=5)
+
         self.out_label = ttk.Label(input_frame, text="Output:")
         self.out_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
         self.out_help = ttk.Label(input_frame, text="(?)", cursor="question_arrow")
         self.out_help.grid(row=1, column=1, padx=(0, 5), pady=5, sticky="w")
-        ToolTip(self.out_help, "The folder where your songs will be saved.\n(Default: 'downloads')")
+        default_download_dir = self.get_default_download_dir()
+        ToolTip(self.out_help, f"The folder where your songs will be saved.\n(Default: '{default_download_dir}')")
         
-        self.out_path = tk.StringVar(value="downloads")
+        self.out_path = tk.StringVar(value=default_download_dir)
         self.out_entry = ttk.Entry(input_frame, textvariable=self.out_path)
         self.out_entry.grid(row=1, column=2, columnspan=2, padx=5, pady=5, sticky="ew")
 
@@ -168,7 +176,7 @@ class DownloaderApp:
         self.dry_run_check.grid(row=2, column=0, columnspan=2, padx=5, pady=5, sticky="w")
         self.dry_run_help = ttk.Label(options_frame, text="(?)", cursor="question_arrow")
         self.dry_run_help.grid(row=2, column=2, padx=(0, 5), pady=5, sticky="w")
-        ToolTip(self.dry_run_help, "Show what commands would be run without\nactually downloading any files.")
+        ToolTip(self.dry_run_help, "Show what commands would be run without\nactually downloading or modifying files.")
 
         # Help button
         self.help_button = ttk.Button(
@@ -177,6 +185,23 @@ class DownloaderApp:
             command=self.open_help_window
         )
         self.help_button.grid(row=2, column=5, padx=5, pady=5, sticky="e")
+
+        # If file exists toggle
+        self.exists_label = ttk.Label(options_frame, text="If file exists:")
+        self.exists_label.grid(row=3, column=0, padx=5, pady=5, sticky="w")
+        self.exists_help = ttk.Label(options_frame, text="(?)", cursor="question_arrow")
+        self.exists_help.grid(row=3, column=1, padx=(0, 5), pady=5, sticky="w")
+        ToolTip(self.exists_help, "What to do if the target file already exists.\nDefault: Skip (do nothing).\nOverwrite: download again and replace the file.")
+
+        self.exists_var = tk.StringVar(value="Skip")
+        self.exists_menu = ttk.Combobox(
+            options_frame,
+            textvariable=self.exists_var,
+            values=["Skip", "Overwrite"],
+            width=10,
+            state="readonly",
+        )
+        self.exists_menu.grid(row=3, column=2, padx=5, pady=5, sticky="w")
 
         # --- 4. Populate the "Status" frame ---
         self.progress_bar = ttk.Progressbar(status_frame, orient="horizontal", mode="determinate")
@@ -295,6 +320,23 @@ class DownloaderApp:
         # 4) Python module fallback
         return [sys.executable, "-m", "yt_dlp"]
 
+    def get_default_download_dir(self):
+        """Return a sensible default Downloads directory for the current user.
+
+        Tries common locations like ~/Downloads (case-insensitive). Falls back to
+        'downloads' under the current user's home if the directory doesn't exist yet.
+        """
+        try:
+            home = Path.home()
+            candidates = [home / "Downloads", home / "downloads"]
+            for c in candidates:
+                if c.exists():
+                    return str(c)
+            # Prefer the standard capitalized path even if not created yet
+            return str(candidates[0])
+        except Exception:
+            return "downloads"
+
     def find_title_artist(self, headers):
         h = [x.lower() for x in headers]
         title_idx = None
@@ -318,7 +360,7 @@ class DownloaderApp:
             return None
         return q + " audio"
 
-    def download_track(self, query, csv_title, out_dir, audio_format, archive_file, dry_run=False, extra_opts=None, timeout=300):
+    def download_track(self, query, csv_title, out_dir, audio_format, archive_file, dry_run=False, extra_opts=None, timeout=300, exists_action="Skip"):
         # Resolve yt-dlp command (may be a list)
         yt_dlp_cmd = self.get_yt_dlp_path()
 
@@ -337,6 +379,8 @@ class DownloaderApp:
             "--newline",
             "--no-warnings",
         ]
+        if exists_action == "Overwrite":
+            cmd += ["--force-overwrites"]
         if archive_file:
             cmd += ["--download-archive", archive_file]
         if extra_opts:
@@ -344,6 +388,11 @@ class DownloaderApp:
 
         if dry_run:
             return {"query": query, "cmd": " ".join(shlex.quote(x) for x in cmd), "status": "dry-run"}
+
+        # Pre-skip if final target file exists and user selected Skip
+        target_path = os.path.join(out_dir, f"{safe_title}.{audio_format}")
+        if exists_action == "Skip" and os.path.exists(target_path):
+            return {"query": query, "status": "skipped"}
 
         try:
             # Hide console window on Windows
@@ -467,15 +516,21 @@ class DownloaderApp:
         guide = (
             "Welcome to SpotiSync!\n\n"
             "Quick Start:\n"
-            "1) CSV File: Click 'Get CSV...' to open Exportify, or 'Browse...' to select a CSV.\n"
-            "   - A CSV with a 'Track Name' column works best.\n"
-            "   - When you select a CSV, SpotiSync tries to auto-make a file with only 'Track Name'.\n"
-            "2) Output: Choose where downloaded songs will be saved (default: downloads).\n"
+            "1) CSV File: Choose one of the following:\n"
+            "   - 'Get CSV...': Open Exportify to export playlists.\n"
+            "   - 'Browse...': Select an existing CSV.\n"
+            "   - 'Create CSV...': Type titles (one per line) and save a CSV with a 'Track Name' column.\n"
+            "   - When you select a CSV, SpotiSync may auto-create a Track-Name-only CSV.\n"
+            "2) Output: Choose where songs will be saved (defaults to your Downloads folder).\n"
             "3) Format: Pick your desired audio format (e.g., mp3, m4a, wav).\n"
             "4) Threads: Number of simultaneous downloads. Higher = faster, but heavier.\n"
-            "5) Archive File: Keeps track of downloaded tracks to avoid duplicates.\n"
-            "6) Dry Run: If enabled, shows the commands without downloading.\n"
-            "7) Start Download: Begins processing. Progress and results show in the Status log.\n\n"
+            "5) Archive File: Tracks downloaded songs to avoid duplicates.\n"
+            "6) If file exists: Choose 'Skip' (default) or 'Overwrite'.\n"
+            "7) Dry Run: Shows commands without downloading or modifying files.\n"
+            "8) Start Download: Progress and results show in the Status log.\n\n"
+            "During Download:\n"
+            "- Live per-track progress shows percent, size, speed, and ETA.\n"
+            "- Finished tracks show [OK], failures show [FAIL], timeouts show [TIMEOUT], skipped show [SKIP].\n\n"
             "Notes & Tips:\n"
             "- The app searches YouTube for 'Track - Artist audio' when possible.\n"
             "- Filenames are sanitized to be safe for your system.\n"
@@ -508,6 +563,93 @@ class DownloaderApp:
                 self.help_window = None
 
         self.help_window.protocol("WM_DELETE_WINDOW", on_close)
+
+    def open_create_csv_window(self):
+        """Open a small window to create a CSV with 'Track Name' column."""
+        if hasattr(self, "create_csv_window") and self.create_csv_window and tk.Toplevel.winfo_exists(self.create_csv_window):
+            self.create_csv_window.lift()
+            self.create_csv_window.focus_force()
+            return
+
+        self.create_csv_window = tk.Toplevel(self.root)
+        self.create_csv_window.title("Create Track CSV")
+        self.create_csv_window.geometry("520x360")
+        self.create_csv_window.minsize(420, 280)
+        self.create_csv_window.transient(self.root)
+
+        container = ttk.Frame(self.create_csv_window)
+        container.pack(fill="both", expand=True, padx=10, pady=10)
+
+        lbl = ttk.Label(container, text="Enter one track title per line. The CSV will contain a 'Track Name' column.")
+        lbl.pack(anchor="w", pady=(0, 8))
+
+        text_frame = ttk.Frame(container)
+        text_frame.pack(fill="both", expand=True)
+
+        self.create_csv_text = tk.Text(text_frame, wrap="word", height=12)
+        vscroll = ttk.Scrollbar(text_frame, orient="vertical", command=self.create_csv_text.yview)
+        self.create_csv_text.configure(yscrollcommand=vscroll.set)
+        self.create_csv_text.pack(side="left", fill="both", expand=True)
+        vscroll.pack(side="right", fill="y")
+
+        actions = ttk.Frame(container)
+        actions.pack(fill="x", pady=(10, 0))
+
+        save_btn = ttk.Button(actions, text="Save CSV", command=self.save_created_csv)
+        save_btn.pack(side="left")
+
+        cancel_btn = ttk.Button(actions, text="Cancel", command=self.create_csv_window.destroy)
+        cancel_btn.pack(side="right")
+
+        def on_close_create():
+            try:
+                self.create_csv_window.destroy()
+            finally:
+                self.create_csv_window = None
+                self.create_csv_text = None
+
+        self.create_csv_window.protocol("WM_DELETE_WINDOW", on_close_create)
+
+    def save_created_csv(self):
+        """Save the entered titles to a CSV and select it."""
+        try:
+            raw = self.create_csv_text.get("1.0", tk.END)
+            titles = [line.strip() for line in raw.splitlines() if line.strip()]
+            if not titles:
+                self.log_status("[WARN] No titles entered; nothing to save.")
+                return
+
+            default_dir = self.out_path.get().strip() or os.getcwd()
+            Path(default_dir).mkdir(parents=True, exist_ok=True)
+            initial_path = os.path.join(default_dir, "tracks.csv")
+
+            save_path = filedialog.asksaveasfilename(
+                title="Save CSV",
+                defaultextension=".csv",
+                filetypes=(("CSV files", "*.csv"), ("All files", "*.*")),
+                initialfile=os.path.basename(initial_path),
+                initialdir=os.path.dirname(initial_path),
+            )
+            if not save_path:
+                return
+
+            with open(save_path, 'w', newline='', encoding='utf-8') as fh:
+                writer = csv.writer(fh)
+                writer.writerow(['Track Name'])
+                for t in titles:
+                    writer.writerow([t])
+
+            self.csv_path.set(save_path)
+            self.log_status(f"[INFO] Created CSV with {len(titles)} tracks: {save_path}")
+
+        except Exception as e:
+            self.log_status(f"[ERROR] Failed to create CSV: {e}")
+        finally:
+            try:
+                if hasattr(self, "create_csv_window") and self.create_csv_window:
+                    self.create_csv_window.destroy()
+            except Exception:
+                pass
 
     def log_status(self, message):
         """Safely inserts a message into the status_log text widget."""
@@ -562,6 +704,9 @@ class DownloaderApp:
                         if err:
                             self.log_status(f"       Error: {err}")
                         self.progress_bar.step(1)
+                    elif status == "skipped":
+                        self.log_status(f"[SKIP] {query}")
+                        self.progress_bar.step(1)
                     elif status == "timeout":
                         self.log_status(f"[TIMEOUT] {query}")
                         err = msg.get('error')
@@ -595,6 +740,7 @@ class DownloaderApp:
         audio_format = self.format_var.get()
         archive_file = self.archive_var.get()
         dry_run = self.dry_run_var.get()
+        exists_action = self.exists_var.get()
         
         try:
             threads = int(self.threads_var.get())
@@ -611,13 +757,13 @@ class DownloaderApp:
 
         # 5. Start the worker thread
         # We pass all the GUI values to the worker function
-        args = (csv_path, out_dir, audio_format, threads, archive_file, dry_run)
+        args = (csv_path, out_dir, audio_format, threads, archive_file, dry_run, exists_action)
         threading.Thread(target=self.download_worker, args=args, daemon=True).start()
 
         # 6. Start the queue-checking loop
         self.root.after(100, self.process_queue)
 
-    def download_worker(self, csv_path, out_dir, audio_format, threads, archive_file, dry_run):
+    def download_worker(self, csv_path, out_dir, audio_format, threads, archive_file, dry_run, exists_action):
         """This is the main function that runs in the new thread."""
         try:
             self.queue.put(f"Parsing CSV: {csv_path} ...")
@@ -636,7 +782,7 @@ class DownloaderApp:
             start_time = time.time()
             with ThreadPoolExecutor(max_workers=threads) as ex:
                 futures = {
-                ex.submit(self.download_track, q['query'], q['title'], out_dir, audio_format, archive_file, dry_run, extra_opts): q 
+                ex.submit(self.download_track, q['query'], q['title'], out_dir, audio_format, archive_file, dry_run, extra_opts, 300, exists_action): q 
                 for q in queries}
 
                 for fut in as_completed(futures):
