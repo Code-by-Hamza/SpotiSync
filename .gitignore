@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# PyInstaller
+*.spec
+build/
+dist/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# User Settings (but keep template)
+settings.json
+
+# Downloaded binaries (users will download these)
+yt-dlp.exe
+ffmpeg.exe
+
+# Archive files
+downloaded_archive.txt
+*_trackname.csv
+
+# Logs
+*.log
+
+# Build artifacts
+*.pyc
+*.pyo
