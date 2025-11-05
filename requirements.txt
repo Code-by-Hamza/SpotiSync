@@ -1,0 +1,3 @@
+tkinter
+sv-ttk>=2.0.0
+pyinstaller>=5.0
