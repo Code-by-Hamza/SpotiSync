@@ -21,7 +21,7 @@ from datetime import datetime
 APP_VERSION = "1.0.0"
 APP_NAME = "SpotiSync"
 
-# --- Tooltip Helper Class ---
+#Tooltip Helper Class
 class ToolTip:
     def __init__(self, widget, text):
         self.widget = widget
@@ -33,8 +33,6 @@ class ToolTip:
     def show_tooltip(self, event):
         if self.tooltip_window:
             return
-
-        # Compute a safe position near the widget
         try:
             bx = by = 0
             bbox = self.widget.bbox("insert")
@@ -50,8 +48,6 @@ class ToolTip:
         self.tooltip_window = tk.Toplevel(self.widget)
         self.tooltip_window.wm_overrideredirect(True)
         self.tooltip_window.wm_geometry(f"+{x}+{y}")
-
-        # Use tk.Label for custom bg/fg; add wrapping and padding
         label = tk.Label(
             self.tooltip_window,
             text=self.text,
@@ -72,7 +68,7 @@ class ToolTip:
             self.tooltip_window.destroy()
             self.tooltip_window = None
 
-# --- Main Application Class ---
+# Main Application Class
 class DownloaderApp:
     def __init__(self, root):
         self.root = root
@@ -80,21 +76,17 @@ class DownloaderApp:
         root.geometry("650x600") 
         root.minsize(550, 500)
         
-        # Set window icon
         try:
             if getattr(sys, 'frozen', False):
-                # Running as compiled EXE
                 icon_path = os.path.join(sys._MEIPASS, 'SpotiSync.ico')
             else:
-                # Running as script
                 icon_path = os.path.join(os.path.dirname(__file__), 'SpotiSync.ico')
             
             if os.path.exists(icon_path):
                 self.root.iconbitmap(icon_path)
         except Exception:
-            pass  # Silently fail if icon not found
-        
-        # Settings file location (AppData or portable mode)
+            pass        
+
         self.settings_file = self.get_settings_path()
         self.settings = self.load_settings()
         
@@ -107,11 +99,10 @@ class DownloaderApp:
 
         sv_ttk.set_theme("dark")
         
-        # Show first-run welcome if needed
         if self.settings.get("first_run", True):
             self.root.after(500, self.show_welcome_dialog)
 
-        # --- 1. Create the main frames ---
+        # Create the main frames
         input_frame = ttk.LabelFrame(root, text="Inputs")
         input_frame.pack(fill="x", padx=10, pady=5)
         input_frame.columnconfigure(2, weight=1)
@@ -129,7 +120,7 @@ class DownloaderApp:
         # Menu bar
         self.create_menu_bar()
 
-        # --- 2. Populate the "Inputs" frame ---
+
         self.csv_label = ttk.Label(input_frame, text="CSV File:")
         self.csv_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
         self.csv_help = ttk.Label(input_frame, text="(?)", cursor="question_arrow")
@@ -186,7 +177,6 @@ class DownloaderApp:
         )
         self.open_folder_button.grid(row=1, column=5, padx=(0, 5), pady=5)
 
-        # --- 3. Populate the "Options" frame ---
         self.format_label = ttk.Label(options_frame, text="Format:")
         self.format_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
         self.format_help = ttk.Label(options_frame, text="(?)", cursor="question_arrow")
@@ -234,15 +224,13 @@ class DownloaderApp:
         self.dry_run_help.grid(row=2, column=2, padx=(0, 5), pady=5, sticky="w")
         ToolTip(self.dry_run_help, "Show what commands would be run without\nactually downloading or modifying files.")
 
-        # Help button
+        # Help button (i have to fix later)
         self.help_button = ttk.Button(
             options_frame,
             text="Help",
             command=self.open_help_window
         )
         self.help_button.grid(row=2, column=5, padx=5, pady=5, sticky="e")
-
-        # If file exists toggle
         self.exists_label = ttk.Label(options_frame, text="If file exists:")
         self.exists_label.grid(row=3, column=0, padx=5, pady=5, sticky="w")
         self.exists_help = ttk.Label(options_frame, text="(?)", cursor="question_arrow")
@@ -259,8 +247,6 @@ class DownloaderApp:
         )
         self.exists_menu.grid(row=3, column=2, padx=5, pady=5, sticky="w")
 
-        # --- 4. Populate the "Status" frame ---
-        # Stats display
         self.stats_frame = ttk.Frame(status_frame)
         self.stats_frame.grid(row=0, column=0, padx=5, pady=(5, 0), sticky="ew")
         
@@ -277,14 +263,13 @@ class DownloaderApp:
         scrollbar.grid(row=2, column=1, sticky="ns")
         self.status_log['yscrollcommand'] = scrollbar.set
         
-        # Configure text tags for colored output
+        # text tags for colored output
         self.status_log.tag_config("success", foreground="#4CAF50")
         self.status_log.tag_config("error", foreground="#F44336")
         self.status_log.tag_config("warning", foreground="#FF9800")
         self.status_log.tag_config("info", foreground="#2196F3")
         self.status_log.tag_config("progress", foreground="#9E9E9E")
 
-        # Button frame
         button_frame = ttk.Frame(status_frame)
         button_frame.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
         button_frame.columnconfigure(0, weight=1)
@@ -306,14 +291,11 @@ class DownloaderApp:
         
         self.queue = queue.Queue()
         
-        # Check for bundled binaries on startup
         self.root.after(100, self.check_dependencies)
-
-    # --- 5. Button Functions ---
+    # functions for buttons 
     def get_settings_path(self):
         """Get the path for settings file (AppData or portable mode)."""
         try:
-            # Try AppData first (standard Windows location)
             appdata = os.getenv('APPDATA')
             if appdata:
                 app_dir = Path(appdata) / APP_NAME
@@ -321,8 +303,7 @@ class DownloaderApp:
                 return app_dir / "settings.json"
         except Exception:
             pass
-        
-        # Fallback to portable mode (next to EXE)
+
         try:
             if getattr(sys, 'frozen', False):
                 exe_dir = Path(sys.executable).parent
@@ -467,7 +448,6 @@ class DownloaderApp:
                 )
                 
                 if result.returncode == 0:
-                    # Extract version from first line
                     first_line = result.stdout.split('\n')[0]
                     self.log_status(f"[INFO] ffmpeg found: {first_line}", "info")
                 else:
@@ -477,7 +457,6 @@ class DownloaderApp:
         else:
             self.log_status("[INFO] ffmpeg not found (optional - may affect audio quality)", "info")
         
-        # Show error dialog if critical dependencies are missing
         if "yt-dlp" in missing:
             msg = (
                 "yt-dlp not found!\n\n"
@@ -528,25 +507,21 @@ class DownloaderApp:
         else:
             self.stats_label.config(text="Ready to download")
 
-    # --- 5. Button Functions ---
     def browse_csv_file(self):
         filename = filedialog.askopenfilename(
             title="Select CSV File",
             filetypes=(("CSV files", "*.csv"), ("All files", "*.*"))
         )
         if filename:
-            # Attempt to auto-extract only the 'Track Name' column to a new CSV.
             try:
                 newfile = self.create_trackname_only_csv(filename)
                 if newfile:
                     self.csv_path.set(newfile)
                     self.log_status(f"[INFO] Extracted 'Track Name' to: {newfile}")
                 else:
-                    # If extraction failed (no column), fall back to original file
                     self.csv_path.set(filename)
                     self.log_status("[WARN] 'Track Name' column not found; using original CSV.")
             except Exception as e:
-                # On unexpected errors, fall back and report
                 self.csv_path.set(filename)
                 self.log_status(f"[ERROR] Failed to process CSV: {e}")
 
@@ -571,7 +546,6 @@ class DownloaderApp:
             with open(src, newline='', encoding='utf-8') as fh:
                 reader = csv.reader(fh)
                 headers = next(reader)
-                # Find index of 'Track Name' (case-insensitive, allow surrounding text)
                 track_idx = None
                 for i, h in enumerate(headers):
                     if h and 'track' in h.lower() and 'name' in h.lower():
@@ -590,7 +564,6 @@ class DownloaderApp:
 
                 return str(dest)
         except Exception as e:
-            # Let caller handle logging; return None to indicate failure
             return None
     
     def get_yt_dlp_path(self):
@@ -604,13 +577,11 @@ class DownloaderApp:
         """
         binary_name = "yt-dlp.exe" if os.name == 'nt' else "yt-dlp"
 
-        # 1) PyInstaller bundle
         if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
             bundled = os.path.join(sys._MEIPASS, binary_name)
             if os.path.exists(bundled):
                 return [bundled]
 
-        # 2) Local directory
         try:
             script_dir = Path(__file__).resolve().parent
             local_bin = script_dir / binary_name
@@ -619,12 +590,10 @@ class DownloaderApp:
         except Exception:
             pass
 
-        # 3) PATH
         found = shutil.which(binary_name)
         if found:
             return [found]
 
-        # 4) Python module fallback
         return [sys.executable, "-m", "yt_dlp"]
     
     def get_ffmpeg_path(self):
@@ -638,13 +607,11 @@ class DownloaderApp:
         """
         binary_name = "ffmpeg.exe" if os.name == 'nt' else "ffmpeg"
 
-        # 1) PyInstaller bundle
         if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
             bundled = os.path.join(sys._MEIPASS, binary_name)
             if os.path.exists(bundled):
                 return bundled
 
-        # 2) Local directory
         try:
             script_dir = Path(__file__).resolve().parent
             local_bin = script_dir / binary_name
@@ -653,12 +620,9 @@ class DownloaderApp:
         except Exception:
             pass
 
-        # 3) PATH
         found = shutil.which(binary_name)
         if found:
             return found
-
-        # 4) Not found - yt-dlp will handle it
         return None
 
     def get_default_download_dir(self):
@@ -673,7 +637,7 @@ class DownloaderApp:
             for c in candidates:
                 if c.exists():
                     return str(c)
-            # Prefer the standard capitalized path even if not created yet
+
             return str(candidates[0])
         except Exception:
             return "downloads"
@@ -702,13 +666,12 @@ class DownloaderApp:
         return q + " audio"
 
     def download_track(self, query, csv_title, out_dir, audio_format, archive_file, dry_run=False, extra_opts=None, timeout=300, exists_action="Skip"):
-        # Resolve yt-dlp command (may be a list)
+
         yt_dlp_cmd = self.get_yt_dlp_path()
         ffmpeg_path = self.get_ffmpeg_path()
 
         search_spec = f"ytsearch1:{query}"
         safe_title = self.sanitize_filename(csv_title)
-        # Create an output template using the sanitized title
         out_template = os.path.join(out_dir, f"{safe_title}.%(ext)s")
 
         cmd = yt_dlp_cmd + [
@@ -722,7 +685,6 @@ class DownloaderApp:
             "--no-warnings",
         ]
         
-        # Add ffmpeg location if found
         if ffmpeg_path:
             cmd += ["--ffmpeg-location", ffmpeg_path]
         
@@ -736,19 +698,16 @@ class DownloaderApp:
         if dry_run:
             return {"query": query, "cmd": " ".join(shlex.quote(x) for x in cmd), "status": "dry-run"}
 
-        # Pre-skip if final target file exists and user selected Skip
         target_path = os.path.join(out_dir, f"{safe_title}.{audio_format}")
         if exists_action == "Skip" and os.path.exists(target_path):
             return {"query": query, "status": "skipped"}
 
         try:
-            # Hide console window on Windows
             startupinfo = None
             if os.name == 'nt':
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-            # Stream stdout to parse progress
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -761,7 +720,6 @@ class DownloaderApp:
 
             start_time = time.time()
             last_progress = None
-            # Regex for lines like: "[download]  12.3% of 4.95MiB at 1.23MiB/s ETA 00:03"
             import re
             prog_re = re.compile(r"^\[download\]\s+(?P<percent>\d+(?:\.\d+)?)%\s+of\s+(?P<size>\S+)\s+at\s+(?P<speed>\S+)\s+ETA\s+(?P<eta>\S+)")
 
@@ -770,7 +728,6 @@ class DownloaderApp:
                     line = (line or "").rstrip()
                     if not line:
                         continue
-                    # Push informative lines for context
                     if line.startswith("[download] Destination:") or line.startswith("[ExtractAudio]"):
                         try:
                             self.queue.put({"status": "info", "query": query, "message": line})
@@ -792,7 +749,6 @@ class DownloaderApp:
                         except Exception:
                             pass
 
-                    # Timeout guard
                     if timeout and (time.time() - start_time) > timeout:
                         proc.kill()
                         return {"query": query, "status": "timeout", "error": f"Timed out after {timeout}s"}
@@ -830,7 +786,6 @@ class DownloaderApp:
 
     def open_help_window(self):
         """Open a small help window with a detailed usage guide."""
-        # If already open, focus it
         if hasattr(self, "help_window") and self.help_window and tk.Toplevel.winfo_exists(self.help_window):
             self.help_window.lift()
             self.help_window.focus_force()
@@ -842,16 +797,14 @@ class DownloaderApp:
         self.help_window.minsize(420, 320)
         self.help_window.transient(self.root)
 
-        # Container frame
+        # container
         container = ttk.Frame(self.help_window)
         container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Title
         title_lbl = ttk.Label(container, text="SpotiSync – Help & Guide", font=("Segoe UI", 12, "bold"))
         title_lbl.pack(anchor="w", pady=(0, 6))
         ttk.Separator(container, orient="horizontal").pack(fill="x", pady=(0, 8))
 
-        # Scrollable text
         text_frame = ttk.Frame(container)
         text_frame.pack(fill="both", expand=True)
 
@@ -893,7 +846,6 @@ class DownloaderApp:
         help_text.insert("1.0", guide)
         help_text.config(state="disabled")
 
-        # Action row
         actions = ttk.Frame(container)
         actions.pack(fill="x", pady=(8, 0))
 
@@ -1005,7 +957,6 @@ class DownloaderApp:
         if tag:
             self.status_log.insert(tk.END, message + "\n", tag)
         else:
-            # Auto-detect tag from message prefix
             if message.startswith("[OK]") or message.startswith("[SUCCESS]"):
                 self.status_log.insert(tk.END, message + "\n", "success")
             elif message.startswith("[FAIL]") or message.startswith("[ERROR]"):
@@ -1020,28 +971,24 @@ class DownloaderApp:
                 self.status_log.insert(tk.END, message + "\n")
         
         self.status_log.config(state="disabled")
-        self.status_log.see(tk.END)  # Auto-scroll to the bottom
+        self.status_log.see(tk.END)  
 
     def process_queue(self):
         """Checks the queue for messages from the download thread."""
         try:
             while True:
-                # Get a message from the queue
                 msg = self.queue.get_nowait()
 
                 if msg == "DONE":
-                    # Re-enable the start button
                     self.start_button.config(state="normal")
                     self.cancel_button.config(state="disabled")
                     self.is_downloading = False
-                    self.save_settings()  # Save settings after download
+                    self.save_settings()  
                     
-                    # Show completion message
                     if not self.cancel_download:
                         self.log_status("\n✓ Download Complete!", "success")
                         self.update_stats_display()
                         
-                        # Offer to open folder
                         if messagebox.askyesno(
                             "Complete",
                             f"Download finished!\n\n"
@@ -1055,17 +1002,15 @@ class DownloaderApp:
                     else:
                         self.log_status("\n✗ Download Cancelled", "warning")
                     
-                    return # Stop checking the queue
+                    return 
                 
                 elif isinstance(msg, dict) and 'total_tracks' in msg:
-                    # Set up the progress bar
                     self.progress_bar['maximum'] = msg['total_tracks']
                     self.progress_bar['value'] = 0
                     self.stats = {"success": 0, "failed": 0, "skipped": 0, "total": msg['total_tracks']}
                     self.update_stats_display()
                 
                 elif isinstance(msg, dict) and 'status' in msg:
-                    # Message from download_track
                     status = msg.get("status")
                     query = msg.get("query")
                     if status == "progress":
@@ -1073,24 +1018,27 @@ class DownloaderApp:
                         size = msg.get("size")
                         speed = msg.get("speed")
                         eta = msg.get("eta")
-                        # Update window title with current progress
                         completed = self.stats["success"] + self.stats["failed"] + self.stats["skipped"]
                         self.root.title(f"{APP_NAME} - Downloading ({completed}/{self.stats['total']}) - {pct}%")
                         self.log_status(f"[PROG] {pct}% of {size} at {speed} ETA {eta}  :: {query}")
-                        # Do not advance the overall progress bar on incremental progress
+
                     elif status == "info":
                         self.log_status(f"[INFO] {msg.get('message','').strip()}")
+
                     elif status == "dry-run":
                         self.log_status(f"[DRY] {msg['cmd']}")
+
                     elif status == "ok":
                         self.stats["success"] += 1
                         self.log_status(f"[OK] {query}", "success")
                         self.progress_bar.step(1)
                         self.update_stats_display()
+
                     elif status == "failed":
                         self.stats["failed"] += 1
                         code = msg.get('returncode')
                         err = msg.get('error') or (msg.get('stderr') or '').strip()
+
                         if code is not None:
                             self.log_status(f"[FAIL] {query} (Code: {code})", "error")
                         else:
@@ -1116,28 +1064,23 @@ class DownloaderApp:
                         self.log_status(f"[{status.upper()}] {query}")
 
                 else:
-                    # It's a plain string message
                     self.log_status(str(msg))
 
         except queue.Empty:
-            # If the queue is empty, schedule this function to run again
             if self.is_downloading or not self.queue.empty():
                 self.root.after(100, self.process_queue)
 
     def start_download_thread(self):
         """Starts the download process in a separate thread."""
-        # 1. Disable button, enable cancel
         self.start_button.config(state="disabled")
         self.cancel_button.config(state="normal")
         self.cancel_download = False
         self.is_downloading = True
 
-        # 2. Clear the log
         self.status_log.config(state="normal")
         self.status_log.delete("1.0", tk.END)
         self.status_log.config(state="disabled")
 
-        # 3. Get all values from the GUI
         csv_path = self.csv_path.get()
         out_dir = self.out_path.get()
         audio_format = self.format_var.get()
@@ -1151,8 +1094,7 @@ class DownloaderApp:
                 threads = 1
         except ValueError:
             threads = 1
-        
-        # 4. Basic validation
+
         if not csv_path:
             messagebox.showerror("Error", "Please select a CSV file.", parent=self.root)
             self.start_button.config(state="normal")
@@ -1167,12 +1109,9 @@ class DownloaderApp:
             self.is_downloading = False
             return
 
-        # 5. Start the worker thread
-        # We pass all the GUI values to the worker function
         args = (csv_path, out_dir, audio_format, threads, archive_file, dry_run, exists_action)
         threading.Thread(target=self.download_worker, args=args, daemon=True).start()
 
-        # 6. Start the queue-checking loop
         self.root.after(100, self.process_queue)
 
     def download_worker(self, csv_path, out_dir, audio_format, threads, archive_file, dry_run, exists_action):
@@ -1206,7 +1145,6 @@ class DownloaderApp:
                     
                     try:
                         res = fut.result()
-                        # Put the result dictionary directly into the queue
                         self.queue.put(res)
                     except Exception as e:
                         self.queue.put(f"[THREAD ERROR] {e}")
@@ -1219,7 +1157,6 @@ class DownloaderApp:
             self.queue.put(f"[FATAL ERROR] {e}")
         finally:
             self.queue.put("DONE")
-            # Reset window title
             self.root.title(f"{APP_NAME} v{APP_VERSION}")
     
     def sanitize_filename(self, s):
@@ -1247,13 +1184,13 @@ class DownloaderApp:
                     q = self.build_query(title, artist)
                     if q:
                         queries.append({"title": title, "artist": "", "query": q})
-            return queries, None # Return (queries, error)
+            return queries, None 
         except FileNotFoundError:
             return None, f"File not found: {csv_path}"
         except Exception as e:
             return None, f"Error parsing CSV: {e}"
 
-# --- Run the Application ---
+# Run the Application
 if __name__ == "__main__":
     main_window = tk.Tk()
     app = DownloaderApp(main_window)
