@@ -59,3 +59,4 @@ downloaded_archive.txt
 # Build artifacts
 *.pyc
 *.pyo
+.ico 
