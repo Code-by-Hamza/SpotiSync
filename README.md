@@ -2,6 +2,8 @@
 
 A beautiful, user-friendly desktop application to download music from Spotify playlists using YouTube as the source.
 
+## ⚠️ Disclaimer: This tool is built for educational purposes only to demonstrate Python GUI, API handling, and file automation. It is not intended for downloading or redistributing copyrighted material. The developer is not responsible for misuse!
+
 ![SpotiSync Screenshot](screenshot.png)
 
 ## ✨ Features
