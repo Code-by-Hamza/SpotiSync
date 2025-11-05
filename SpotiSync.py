@@ -80,6 +80,20 @@ class DownloaderApp:
         root.geometry("650x600") 
         root.minsize(550, 500)
         
+        # Set window icon
+        try:
+            if getattr(sys, 'frozen', False):
+                # Running as compiled EXE
+                icon_path = os.path.join(sys._MEIPASS, 'SpotiSync.ico')
+            else:
+                # Running as script
+                icon_path = os.path.join(os.path.dirname(__file__), 'SpotiSync.ico')
+            
+            if os.path.exists(icon_path):
+                self.root.iconbitmap(icon_path)
+        except Exception:
+            pass  # Silently fail if icon not found
+        
         # Settings file location (AppData or portable mode)
         self.settings_file = self.get_settings_path()
         self.settings = self.load_settings()
