@@ -1,3 +1,7 @@
+# ⚠️ PROJECT NO LONGER MAINTAINED
+
+**This project is officially deprecated and is no longer being actively developed or maintained.** 
+
 # 🎵 SpotiSync
 
 A beautiful, user-friendly desktop application to download music from Spotify playlists using YouTube as the source.
